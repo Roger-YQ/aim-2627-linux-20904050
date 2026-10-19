@@ -5,6 +5,28 @@ set -eu
 input=${1:?需要输入目录}
 output=${2:?需要输出目录}
 
-# TODO：删除下方提示和 exit 77，再填写你的命令。
-printf '%s\n' 'Q7 尚未实现' >&2
-exit 77
+# 读取本题参数：HOST、PORT、REMOTE_USER、KEY_PATH、KNOWN_HOSTS、REMOTE_LOG
+source "$input/remote.env"
+
+mkdir -p "$output/received"
+config="$output/ssh_config"
+
+# 1. 生成仅本人可读的 SSH 客户端配置，别名 aim-sentry
+{
+    printf 'Host aim-sentry\n'
+    printf '    HostName %s\n' "$HOST"
+    printf '    Port %s\n' "$PORT"
+    printf '    User %s\n' "$REMOTE_USER"
+    printf '    IdentityFile "%s"\n' "$KEY_PATH"
+    printf '    UserKnownHostsFile "%s"\n' "$KNOWN_HOSTS"
+    printf '    IdentitiesOnly yes\n'
+    printf '    StrictHostKeyChecking yes\n'
+    printf '    BatchMode yes\n'
+} > "$config"
+chmod 600 "$config"
+
+# 2. 用该配置和别名执行远端 whoami
+ssh -F "$config" aim-sentry whoami > "$output/remote-user.txt"
+
+# 3. 用 SCP 下载远端日志
+scp -F "$config" "aim-sentry:$REMOTE_LOG" "$output/received/errors.log"
